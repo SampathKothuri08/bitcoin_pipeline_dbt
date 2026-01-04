@@ -1,4 +1,7 @@
-{{ config(materialized='table')}}
+{{ config(materialized='table',incremental_strategy='append')}}
+
+
+with flattened_outputs as (
 select 
 tx.HASH_KEY,
 tx.BLOCK_NUMBER,
@@ -11,4 +14,20 @@ from
 
 LATERAL FLATTEN(INPUT => outputs) f
 
-where f.value:address is not null
+where f.value:address is not null 
+
+{% if is_incremental() %}
+
+and tx.BLOCK_TIMESTAMP >= (select max(BLOCK_TIMESTAMP) from {{ this }})
+
+{% endif %}
+)
+select 
+HASH_KEY,
+BLOCK_NUMBER,
+BLOCK_TIMESTAMP,
+IS_COINBASE,
+output_address,
+output_value
+
+from flattened_outputs
